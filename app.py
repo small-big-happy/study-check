@@ -104,6 +104,12 @@ init_db()
 # ---------------------- 页面 ----------------------
 st.set_page_config(page_title="任务打卡工具", layout="wide")
 
+# 上传框重置：上传成功后自动清空，避免重复上传
+if st.session_state.get("bg_upload_clear"):
+    if "bg_upload" in st.session_state:
+        del st.session_state["bg_upload"]
+    st.session_state["bg_upload_clear"] = False
+
 # 侧边栏背景设置（改动后立即应用）
 with st.sidebar:
     st.subheader("🎨 背景设置")
@@ -135,10 +141,17 @@ with st.sidebar:
             for i, hp in enumerate(hist):
                 with cols[i % 2]:
                     st.image(hp, width=110)
-                    if st.button("使用", key=f"use_{hp}"):
+                    b1, b2 = st.columns(2)
+                    if b1.button("使用", key=f"use_{hp}"):
                         ext = os.path.splitext(hp)[1].lower()
                         mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif"}.get(ext, "image/jpeg")
                         save_bg({"type": "image", "image": hp, "mime": mime})
+                        st.rerun()
+                    if b2.button("🗑️ 删除", key=f"del_{hp}"):
+                        if os.path.exists(hp):
+                            os.remove(hp)
+                        if bg.get("image") == hp:
+                            save_bg({"type": "none"})
                         st.rerun()
             if cur_img in hist:
                 st.caption(f"✅ 当前背景：{os.path.basename(cur_img)}")
@@ -147,7 +160,7 @@ with st.sidebar:
 
         # ---- 上传新背景 ----
         st.markdown("**📤 上传新背景**")
-        uploaded = st.file_uploader("上传背景图片（png/jpg）", type=["png", "jpg", "jpeg", "gif"])
+        uploaded = st.file_uploader("上传背景图片（png/jpg）", type=["png", "jpg", "jpeg", "gif"], key="bg_upload")
         if uploaded is not None:
             ext = os.path.splitext(uploaded.name)[1].lower()
             mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif"}.get(ext, "image/jpeg")
@@ -156,6 +169,7 @@ with st.sidebar:
             with open(path, "wb") as f:
                 f.write(uploaded.getbuffer())
             save_bg({"type": "image", "image": path, "mime": mime})
+            st.session_state["bg_upload_clear"] = True
             st.success("新背景已保存并应用")
             st.rerun()
 
